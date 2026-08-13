@@ -1,0 +1,9 @@
+{
+  "name": "priva-api",
+  "version": "1.0.0",
+  "description": "Priva Player API",
+  "main": "api/index.js",
+  "dependencies": {
+    "@definisi/vidsrc-scraper": "^1.0.0"
+  }
+}
