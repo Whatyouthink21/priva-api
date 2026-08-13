@@ -1,20 +1,17 @@
 // api/index.js
-// Using vidsrc.ts - a more reliable scraper
+const axios = require('axios');
 
 module.exports = async (req, res) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
-  // Handle preflight
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  // Get parameters
   const { tmdb_id, type, season, episode } = req.query;
 
-  // If no parameters, show API info
   if (!tmdb_id || !type) {
     return res.json({
       status: 'Priva Player API is running!',
@@ -27,42 +24,78 @@ module.exports = async (req, res) => {
   }
 
   try {
-    // Import the scraper
-    const { vidsrc } = require('vidsrc.ts');
-    
-    console.log(`📺 Fetching: ${type} ${tmdb_id}`);
-    
-    // Get the video
-    let result;
-    
+    // Build the URL
+    let embedUrl;
     if (type === 'movie') {
-      result = await vidsrc.movie(tmdb_id);
-    } else if (type === 'tv') {
-      const s = parseInt(season) || 1;
-      const e = parseInt(episode) || 1;
-      result = await vidsrc.tv(tmdb_id, s, e);
+      embedUrl = `https://vidsrc.to/embed/movie/${tmdb_id}`;
     } else {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid type. Use "movie" or "tv"'
-      });
+      const s = season || 1;
+      const e = episode || 1;
+      embedUrl = `https://vidsrc.to/embed/tv/${tmdb_id}/${s}/${e}`;
     }
     
-    if (result && result.url) {
+    console.log(`📺 Fetching: ${embedUrl}`);
+    
+    // Fetch the page
+    const response = await axios.get(embedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      }
+    });
+    
+    const html = response.data;
+    
+    // Try to find the video URL
+    // Look for patterns like: "https://.../master.m3u8"
+    const patterns = [
+      /https?:\/\/[^"'\s]+\.m3u8[^"'\s]*/g,
+      /https?:\/\/[^"'\s]+\.mp4[^"'\s]*/g,
+      /https?:\/\/[^"'\s]+\.ts[^"'\s]*/g
+    ];
+    
+    let videoUrl = null;
+    for (const pattern of patterns) {
+      const matches = html.match(pattern);
+      if (matches && matches.length > 0) {
+        videoUrl = matches[0];
+        break;
+      }
+    }
+    
+    if (videoUrl) {
+      console.log('✅ Found video URL');
       res.json({
         success: true,
-        url: result.url,
-        subtitles: result.subtitles || [],
-        title: result.title || ''
+        url: videoUrl,
+        subtitles: [],
+        title: 'Video found'
       });
     } else {
-      res.status(404).json({
-        success: false,
-        error: 'No stream found'
-      });
+      // Try an alternative approach - look for iframe src
+      const iframeMatch = html.match(/<iframe[^>]+src=["']([^"']+)["']/i);
+      if (iframeMatch) {
+        const iframeUrl = iframeMatch[1];
+        console.log('🔍 Found iframe:', iframeUrl);
+        
+        // If it's a relative URL, make it absolute
+        const finalUrl = iframeUrl.startsWith('http') ? iframeUrl : `https://vidsrc.to${iframeUrl}`;
+        
+        res.json({
+          success: true,
+          url: finalUrl,
+          subtitles: [],
+          title: 'Video found (iframe)'
+        });
+      } else {
+        console.log('❌ No video found');
+        res.status(404).json({
+          success: false,
+          error: 'No video stream found'
+        });
+      }
     }
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('❌ Error:', error.message);
     res.status(500).json({
       success: false,
       error: 'Server error: ' + error.message
