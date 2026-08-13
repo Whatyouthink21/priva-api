@@ -1,10 +1,10 @@
 // api/index.js
-// This is the main API endpoint - it works with Vercel's default routing
+// Using vidsrc.ts - a more reliable scraper
 
 module.exports = async (req, res) => {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
 
   // Handle preflight
   if (req.method === 'OPTIONS') {
@@ -28,17 +28,30 @@ module.exports = async (req, res) => {
 
   try {
     // Import the scraper
-    const { scrapeVidsrc } = require('@definisi/vidsrc-scraper');
+    const { vidsrc } = require('vidsrc.ts');
     
     console.log(`📺 Fetching: ${type} ${tmdb_id}`);
     
     // Get the video
-    const result = await scrapeVidsrc(tmdb_id, type, season || null, episode || null);
+    let result;
     
-    if (result && result.hlsUrl) {
+    if (type === 'movie') {
+      result = await vidsrc.movie(tmdb_id);
+    } else if (type === 'tv') {
+      const s = parseInt(season) || 1;
+      const e = parseInt(episode) || 1;
+      result = await vidsrc.tv(tmdb_id, s, e);
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid type. Use "movie" or "tv"'
+      });
+    }
+    
+    if (result && result.url) {
       res.json({
         success: true,
-        url: result.hlsUrl,
+        url: result.url,
         subtitles: result.subtitles || [],
         title: result.title || ''
       });
