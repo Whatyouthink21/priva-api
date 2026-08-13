@@ -4,6 +4,6 @@
   "description": "Priva Player API",
   "main": "api/index.js",
   "dependencies": {
-    "@definisi/vidsrc-scraper": "^1.0.0"
+    "vidsrc.ts": "^1.0.0"
   }
 }
