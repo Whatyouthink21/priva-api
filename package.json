@@ -4,6 +4,7 @@
   "description": "Priva Player API",
   "main": "api/index.js",
   "dependencies": {
-    "vidsrc.ts": "^1.0.0"
+    "vidsrc": "^1.0.5",
+    "axios": "^1.6.0"
   }
 }
